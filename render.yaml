@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: backend-notes
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+    plan: free
