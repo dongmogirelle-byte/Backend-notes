@@ -1,70 +1,134 @@
-
+require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
- const app = express()
- 
- app.use(express.static('dist'))
- app.use(express.json())
- app.use(cors())
- const requestLogger = (request, response, next) => {
-    console.log('Method:', request.method)
-    console.log('Path:', request.path)
-    console.log('Body:', request.body)
-    console.log('--')
-    next()
+const mongoose = require('mongoose')
+const dns = require('dns')
+const Note = require('./models/note')
+
+dns.setServers(['1.1.1.1', '8.8.8.8'])
+
+const url = process.env.MONGODB_URI || 'mongodb+srv://dongmogirelle_db_user:Prestige0@cluster0.ayufcop.mongodb.net/NotesApp?appName=Cluster0'
+mongoose.set('strictQuery', false)
+
+mongoose.connect(url)
+  .then(() => {
+    console.log('Connecté à MongoDB')
+  })
+  .catch(error => {
+    console.error('Erreur de connexion MongoDB:', error.message)
+  })
+
+const app = express()
+
+app.use(express.static('dist'))
+app.use(express.json())
+app.use(cors())
+
+const requestLogger = (request, response, next) => {
+  console.log('Method:', request.method)
+  console.log('Path:', request.path)
+  console.log('Body:', request.body)
+  console.log('--')
+  next()
+}
+app.use(requestLogger)
+
+app.get('/', (request, response) => {
+  response.send('<h1>Hello World!</h1>')
+})
+
+app.get('/api/notes', (request, response) => {
+  Note.find({}).then(notes => {
+    response.json(notes)
+  })
+})
+
+app.delete('/api/notes/:id', (request, response, next) => {
+   Note.findByIdAndDelete(request.params.id)
+   .then(result => {
+   response.status(204).end()
+   })
+   .catch(error => next(error))
+   })
+
+app.get('/api/notes/:id', (request, response) => {
+  Note.findById(request.params.id).then(note => {
+    if (note) {
+      response.json(note)
+    } else {
+      response.status(404).end()
+    }
+  })
+})
+  
+
+app.get('/api/notes/:id', (request, response, next) => {
+   Note.findById(request.params.id)
+   .then(note => {
+   if (note) {
+   response.json(note)
+   } else {
+   response.status(404).end()
    }
-   app.use(requestLogger)
+   })
+  .catch(error => next(error))
+   })
 
- let notes = [
- {
- id: 1,
- content: "HTML is easy",
- date: "2022-05-0T17:30:31.098Z",
- important: true },
- {
- id: 2,
- content: "Browser can execute only Javascript",
- date: "2022-05-30T18:39:34.091Z",
- important: false
- },
- {
- id: 3,
- content: "GET and POST are the most important methods of HTTPprotocol",
- date: "2022-05-30T19:20:14.298Z",
- important: true
- }]
+app.post('/api/notes', (request, response) => {
+  const body = request.body
+  
+  if (!body.content) {
+    return response.status(400).json({
+      error: 'content missing'
+    })
+  }
 
- 
+  app.get('/api/notes/:id', (request, response) => {
+     Note.findById(request.params.id)
+     .then(note => {
+     if (note) {
+     response.json(note)
+     } else {
+     response.status(404).end()
+    }
     
- app.get('/', (request, response) => {
-     response.send('<h1>Hello World!</h1>')
     })
-   
- app.get('/api/notes', (request, response) => {
- response.json(notes)
-
+     .catch(error => {
+     console.log(error)
+     response.status(400).send({ error: 'malformatted id' })
+     })
     })
-    app.get('/api/notes', (request, response) => {
-         response.json(notes)
-         })
-         app.get('/api/notes/:id', (request, response) => {
-             const id = request.params.id
-             const note = notes.find(note => {
-             console.log(note.id, typeof note.id, id, typeof id, note.id ===
-            id)
-             return note.id === id
-             })
-             console.log(note)
-             response.json(note)
-            })  
 
-            app.post('/api/notes', (request, response) => {
-                 const note = request.body
-                 console.log(note)
-                 response.json(note)
-                })
-                
-                const PORT = process.env.PORT || 3001
-                 app.listen(PORT, () => {
-                 console.log(`Server running on port ${PORT}`)
-                })
+    app.put('/api/notes/:id', (request, response, next) => {
+       const { content, important } = request.body
+      
+       Note.findById(request.params.id)
+       .then(note => {
+       if (!note) {
+       return response.status(404).end()
+       }
+       note.content = content
+       note.important = important
+      
+        return note.save().then((updatedNote) => {
+      response.json(updatedNote)
+       })
+      })
+       .catch(error => next(error))
+       })
+      
+
+  const note = new Note({
+    content: body.content,
+    important: body.important || false,
+  })
+
+  note.save().then(savedNote => {
+    response.json(savedNote)
+  })
+})
+
+const PORT = process.env.PORT || 3001
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
